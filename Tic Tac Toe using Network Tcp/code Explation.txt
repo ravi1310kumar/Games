@@ -1,0 +1,407 @@
+server
+--------------
+
+
+import java.net.*;
+import java.io.*;
+
+public class TicTacToeServer {
+public static void main(String[] args) throws Exception {
+ServerSocket serverSocket = new ServerSocket(8000);
+System.out.println("Server started");
+
+
+    // Wait for player 1 to connect
+    Socket player1 = serverSocket.accept();
+    System.out.println("Player 1 connected");
+
+    // Let player 1 know they are X
+    PrintWriter out = new PrintWriter(player1.getOutputStream(), true);
+    out.println("X");
+    
+
+    // Wait for player 2 to connect
+    Socket player2 = serverSocket.accept();
+    System.out.println("Player 2 connected");
+
+    // Let player 2 know they are O
+    out = new PrintWriter(player2.getOutputStream(), true);
+    out.println("O");
+
+    
+
+    // Game loop
+
+  String [][] board = new String [3][3];
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                board[i][j] = "-";
+            }
+        }
+String currentPlayer = "X";
+while (true) {
+    // Get the input and output streams for the current player
+    Socket currentPlayerSocket = currentPlayer.equals("X") ? player1 : player2;
+    Socket otherPlayerSocket = currentPlayer.equals("X") ? player2 : player1;
+    //out = new PrintWriter(currentPlayerSocket.getOutputStream(), true);
+    
+    PrintWriter currPlayer=new PrintWriter(currentPlayerSocket.getOutputStream(), true);
+    // Let the player know it's their turn
+    currPlayer.println("YOUR_MOVE");
+   
+    PrintWriter otherPlayer = new PrintWriter(otherPlayerSocket.getOutputStream(), true);
+    otherPlayer.println("MESSAGE Waiting for opponent's move");
+    
+    // Get the player's move
+    BufferedReader in = new BufferedReader(new InputStreamReader(currentPlayerSocket.getInputStream()));
+    String move = in.readLine();
+    
+    
+     
+    String[] moveParts = move.split(" ");
+    int row = Integer.parseInt(moveParts[0]);
+    int col = Integer.parseInt(moveParts[1]);
+    if(row>2 || col>2 || board[row][col]!="-")
+    {
+        currPlayer.println("INVALID_MOVE");
+        otherPlayer.println("INVALID_MOVE");
+        continue;
+    }
+    else
+    {
+        currPlayer.println("SUCCESSFUL_MOVE");
+        otherPlayer.println("UPDATING BOARD");
+    }
+    // Update the board
+    board[row][col] = currentPlayer;
+
+    // Print the updated board
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            currPlayer.print(board[i][j] + " ");
+            otherPlayer.print(board[i][j] + " ");
+        }
+        currPlayer.println();
+        otherPlayer.println();
+    }
+
+    // Check if the current player has won
+    if (hasWon(board, currentPlayer)) {
+        currPlayer.println("VICTORY");
+        otherPlayer.println("DEFEAT");
+        break;
+    }
+
+    // Check if there is a tie
+    if (isTie(board)) {
+        currPlayer.println("TIE");
+        otherPlayer.println("TIE");
+        break;
+    }
+
+    // Switch to the other player
+    currentPlayer = currentPlayer.equals("X") ? "O" : "X";
+}
+
+}
+
+
+//Check if player has won the game
+public static boolean hasWon(String[][] board, String player) {
+    // Check rows
+    for (int i = 0; i < 3; i++) {
+        if (board[i][0].equals(player) && board[i][1].equals(player) && board[i][2].equals(player)) {
+            return true;
+        }
+    }
+
+    // Check columns
+    for (int i = 0; i < 3; i++) {
+        if (board[0][i].equals(player) && board[1][i].equals(player) && board[2][i].equals(player)) {
+            return true;
+        }
+    }
+// Check diagonals
+if (board[0][0].equals(player) && board[1][1].equals(player) && board[2][2].equals(player)) {
+    return true;
+}
+if (board[0][2].equals(player) && board[1][1].equals(player) && board[2][0].equals(player)) {
+    return true;
+}
+
+// No winner yet
+return false;
+}
+public static boolean isTie(String[][] board) {
+    // Check if any positions are still empty
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (board[i][j] == "-") {
+                return false;
+            } 
+        }
+    }
+
+    // Check if there is a winner
+    return !hasWon(board, "X") && !hasWon(board, "O");
+    }
+}
+
+
+explaination of server
+----------------------------
+
+
+Here's a brief summary of the code:
+
+The code starts by creating a server socket and waiting for the first player (Player 1) to connect. It then assigns "X" to Player 1 and waits for the second player (Player 2) to connect, assigning "O" to Player 2.
+After both players are connected, the game loop starts. Inside the loop, the current player's socket is determined based on whose turn it is, and the other player's socket is also identified.
+The current player is notified to make a move, and the other player is informed that they are waiting for the opponent's move.
+The current player's move is read from their socket's input stream, and the move is validated to ensure that it is within the game board's bounds and that the position is not already occupied.
+If the move is invalid, the current player and the other player are notified. If the move is valid, the board is updated with the player's move, and the updated board is sent to both players.
+The game checks for a winner by calling the hasWon() method, which checks the rows, columns, and diagonals for a win. If there is a winner, the winner is notified, and the loop breaks.
+If there is no winner, the game checks for a tie by calling the isTie() method, which checks if all positions on the board are occupied. If there is a tie, both players are notified, and the loop breaks.
+Finally, the loop switches to the other player, and the game continues until a winner is determined or a tie occurs
+
+
+
+client
+-------------------
+
+
+
+import java.awt.*;
+import java.awt.event.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+
+import javax.swing.BorderFactory;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+
+public class Client {
+
+	static boolean isFrameClicked = false;
+	static String move = "";
+	
+	static String title = "TicTacToe";
+
+	public static void main(String[] args) throws Exception {
+
+		int dimension = 600;
+
+		JFrame frame = new JFrame();
+		frame.setTitle(title);
+		frame.setPreferredSize(new Dimension(dimension, dimension));
+		frame.setResizable(false);
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+		frame.setLayout(new GridLayout(3, 3));
+
+		//Initialize markers
+		JLabel[] markers = new JLabel[9];
+		for (int i = 0; i < 9; i++){
+			markers[i] = new JLabel();
+			markers[i].setFont(new Font("Arial", Font.BOLD, 85));
+		}
+
+		for (JLabel marker : markers) {
+			JPanel panel = new JPanel();
+			panel.setLayout(new GridBagLayout());  //centers the component
+			panel.setSize(dimension / 3, dimension / 3);
+			panel.setBorder(BorderFactory.createLineBorder(Color.black));
+
+			panel.add(marker);
+			frame.add(panel);
+		}
+
+		frame.addMouseListener(new MouseListener() {
+
+			@Override
+			public void mouseClicked(MouseEvent e) {
+				Point click = e.getPoint();
+				int clickI = click.y / (dimension / 3);
+				int clickJ = click.x / (dimension / 3);
+
+				isFrameClicked = true;
+				move = clickI + " " + clickJ;
+			}
+
+			@Override
+			public void mousePressed(MouseEvent e) {
+				// TODO Auto-generated method stub
+
+			}
+
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				// TODO Auto-generated method stub
+
+			}
+
+			@Override
+			public void mouseEntered(MouseEvent e) {
+				// TODO Auto-generated method stub
+
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e) {
+				// TODO Auto-generated method stub
+
+			}
+		});
+
+		frame.pack();
+		frame.setVisible(true);
+
+		Socket socket = new Socket("localhost", 8000);
+		BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+		PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+
+		// Get welcome message
+
+		// Determine player's mark (X or O)
+		String mark = in.readLine();
+		System.out.println("WELCOME " + mark);
+		
+		title += " | Player : " + mark;
+
+		// Start game loop
+		while (true) {
+			String line = in.readLine();
+			isFrameClicked = false;
+			
+			frame.setTitle(title);
+
+			// Check for end of game
+			if (line.startsWith("VICTORY")) {
+				System.out.println("You win!");
+				
+				JLabel winLabel = new JLabel("You Win!");
+				winLabel.setFont(new Font("Arial", Font.BOLD, 35));
+				for (JLabel marker : markers) {
+					marker.getParent().setVisible(false);
+				}
+				frame.setLayout(new GridBagLayout());
+				frame.add(winLabel);
+				
+				break;
+			} else if (line.startsWith("DEFEAT")) {
+				System.out.println("You lose.");
+				
+				JLabel loseLabel = new JLabel("You Lose!");
+				loseLabel.setFont(new Font("Arial", Font.BOLD, 35));
+				for (JLabel marker : markers) {
+					marker.getParent().setVisible(false);
+				}
+				frame.setLayout(new GridBagLayout());
+				frame.add(loseLabel);
+				
+				break;
+			} else if (line.startsWith("TIE")) {
+				System.out.println("It's a tie.");
+
+				JLabel tieLabel = new JLabel(" T I E! ");
+				tieLabel.setFont(new Font("Arial", Font.BOLD, 35));
+				for (JLabel marker : markers) {
+					marker.getParent().setVisible(false);
+				}
+				frame.setLayout(new GridBagLayout());
+				frame.add(tieLabel);
+				break;
+			} else if (line.startsWith("MESSAGE")) {
+				System.out.println(line.substring(8));
+				line = in.readLine();
+				if (line.equals("INVALID_MOVE")) {
+					System.out.println("Invalid move played by opponent.");
+				} else {
+					System.out.println("UPDATING BOARD");
+					printBoard(in, markers);
+				}
+			} else if (line.startsWith("YOUR_MOVE")) {
+
+				// Get the player's move
+
+				frame.setTitle(title + " | YOUR TURN");
+
+				//waits till user clicks
+				while (!isFrameClicked) {
+					Thread.sleep(10);
+				}
+
+				out.println(move);
+				line = in.readLine();
+
+				if (line.equals("INVALID_MOVE")) {
+					System.out.println("Invalid move, try again.");
+					continue;
+				} else
+					System.out.println(line);
+				// Print the updated board
+				printBoard(in, markers);
+			} else if (line.equals("INVALID_MOVE")) {
+				System.out.println("Invalid move, try again.");
+				continue;
+			}
+		}
+
+		socket.close();
+	}
+
+	// Print the Tic Tac Tie board
+	public static void printBoard(BufferedReader in, JLabel[] markers) throws IOException {
+		String[][] board = new String[3][3];
+		for (int i = 0; i < 3; i++) {
+			String line = in.readLine();
+			String[] row = line.split(" ");
+			for (int j = 0; j < 3; j++) {
+				board[i][j] = row[j];
+				if(!row[j].equals("-"))
+					markers[i * 3 + j].setText(row[j] + "");
+			}
+		}
+
+		System.out.println("  0 1 2");
+		for (int i = 0; i < 3; i++) {
+			System.out.print(i + " ");
+			for (int j = 0; j < 3; j++) {
+				System.out.print(board[i][j] + " ");
+			}
+			System.out.println();
+		}
+	}
+}
+
+
+
+explaination of client
+--------------------------------
+
+
+The client-side code creates a graphical user interface (GUI) using the Java Swing library, which shows a 3x3 grid for the Tic-Tac-Toe board. The user can click on the squares of the board to make a move. When the user clicks on a square, the client sends the move to the server, which then updates the game board and sends the updated board back to the client. The client then updates the GUI to display the new state of the board.
+
+The client-side code also listens for messages from the server, which can be used to notify the client of various events, such as the end of the game or an invalid move. When the game ends, the client displays a message to indicate whether the player has won, lost, or tied the game.
+
+The code establishes a network connection with the server using a Socket object, which connects to the server at the IP address "localhost" and port number 8000. The client reads and writes data to the server using streams created from the Socket object.
+
+The code also defines a couple of static variables to keep track of the game state, such as whether the user has clicked on the GUI and what move they made. Finally, the code defines a few utility functions, such as printBoard() for displaying the game board in the GUI and adding borders to the GUI components using the BorderFactory class
+
+
+There are several ways to monetize a Tic Tac Toe game:
+
+In-App Advertising: You can integrate ads into your Tic Tac Toe game and make money through impressions and clicks on those ads.
+
+In-App Purchases: You can offer in-app purchases, such as unlocking additional features or game modes, to your users. This can be a good way to generate revenue, especially if your game has a large user base.
+
+Subscription Model: You can offer a subscription-based model for your Tic Tac Toe game, where users pay a recurring fee to access exclusive content or features.
+
+Sponsorship and Branding: You can partner with brands or sponsors to display their products or services in your game, which can generate revenue through advertising fees.
+
+Paid Downloads: You can charge users to download your Tic Tac Toe game from the app store. However, this may be a less effective monetization strategy, as there are many free Tic Tac Toe games available.
+
+Ultimately, the best way to monetize your Tic Tac Toe game will depend on your target audience, your game's features, and your marketing strategy..
